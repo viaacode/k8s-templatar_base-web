@@ -43,9 +43,11 @@ cicd-helloworld-example_REPO      	:= $(REPO_URL)
 cicd-helloworld-example_CFG_REPO       	:= $(CFG_REPO_URL)
 
 
-.PHONY: all set-ns build-all deploy-all-envs redeploy-all-envs undeploy-all-apps clone buildi pushi
+.PHONY: all set-ns build-all deploy-all-envs redeploy-all-envs undeploy-all-apps clone_appcode buildi pushi clone_cfg image2acr
 all: set-ns build-all push_cfg
 
+
+# Use this to push the image to azure registry
 image2acr: clone buildi pushi
 
 set-ns:
@@ -55,7 +57,7 @@ set-ns:
 
 
 
-clone:
+clone_appcode:
 	@rm -rf $(APP_NAME) 2>/dev/null || true
 	@git clone $(REPO_URL) $(APP_NAME) || true
 
@@ -65,8 +67,9 @@ clone_cfg: build-all
 	@git clone $(CFG_REPO_URL) $(REMOTE_CFG_DIR) || true
 
 
-build_cfg: clone_cfg
-	rsync -va --progress k8s-resources $(REMOTE_CFG_DIR)
+build_cfg: clean clone_cfg
+	@rsync -va --progress k8s-resources/kustomize/$(APP_NAME) $(REMOTE_CFG_DIR)/
+	@rsync -va --progress k8s-resources/argocd $(REMOTE_CFG_DIR)/
 
 buildi:
 	FINAL_NAME=$(FINAL_NAME) APP_NAME=$(APP_NAME) docker build ./$(APP_NAME) -t $(FINAL_NAME)
