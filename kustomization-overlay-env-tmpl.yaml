@@ -1,0 +1,52 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ${NAMESPACE}
+
+resources:
+  - ../../base
+  - ${APP_NAME}-${ENV}-externalsecret.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: ${APP_NAME}-config        # matches <app>-config in envFrom
+    envs:
+      - ${APP_NAME}-config-${ENV}.env
+
+namePrefix: ${PREFIX}-
+nameSuffix: -${SUFFIX}
+
+labels:
+- includeSelectors: true
+  pairs:
+    env: ${ENV}
+
+
+patches:
+  - path: patch-replicas.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: ".*"
+
+  - path: patch-resources.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: ".*"
+
+#patches:
+#- path: patch-replica.yaml
+#  target:
+#    kind: Deployment
+#    name: ${PREFIX}-${APP_NAME}-${ENV}
+
+
+#images:
+#- name: ${REGISTRY_HOST}/${NAMESPACE}/${APP_NAME}:devel
+#  newName: ${REGISTRY_HOST}/${NAMESPACE}/${APP_NAME}
+#  newTag: ${ENV}
