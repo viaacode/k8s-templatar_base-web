@@ -3,3 +3,5 @@ source_envs.sh
 **.crt
 **.env
 **.ca
+**.token
+**external-secret-store*

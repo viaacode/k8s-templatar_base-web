@@ -18,13 +18,15 @@ CFG_GIT_TOKEN        ?= $${GIT_PASSWORD}
 # SSH auth vars (CFG_AUTH=ssh)
 CFG_REPO_SSH_URL     ?=   # e.g. git@github.com:org/repo.git
 CFG_GIT_SSH_KEY_FILE ?=   # path to deploy key file
-NAMESPACE            ?= $(ARGOCD_NS)
+IMAGE_UPDATER_URL    := https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/stable/config/install.yaml
 
-export NAMESPACE
 
-.PHONY: cfg-bootstrap cfg-sync cfg-push argocd-bootstrap argocd-apply-projects argocd-apply-repo-creds
+.PHONY: cfg-bootstrap cfg-sync cfg-push argocd-bootstrap argocd-apply-projects argocd-apply-repo-creds install_image_updater
 
 cfg-bootstrap: clone_cfg cfg-sync cfg-push
+
+install_image_updater:
+	kubectl apply -n argocd -f $(IMAGE_UPDATER_URL)
 
 # Sync local generated output into the config repo working tree
 cfg-sync:
@@ -119,7 +121,7 @@ cicd-helloworld-example_REPO      	:= $(REPO_URL)
 cicd-helloworld-example_CFG_REPO       	:= $(CFG_REPO_URL)
 
 
-.PHONY: all set-ns build-all deploy-all-envs redeploy-all-envs undeploy-all-apps clone_appcode buildi pushi clone_cfg image2acr argocd_password
+.PHONY: all set-ns build-all deploy-all-envs redeploy-all-envs undeploy-all-apps clone_appcode buildi pushi clone_cfg image2acr
 all: set-ns build-all push_cfg
 
 
@@ -321,5 +323,12 @@ int: K8S_CTX=aks-tst
 prd: set-ns build-all lint argocd-deploy-root-env
 
 
+argocd_login: set-ns
+	kubectl config set-context --current --namespace argocd
+	bash -c 'argocd login --core'
+
+test_argocd: argocd_login
+	@argocd app list
 
 
+test: set-ns test_argocd
