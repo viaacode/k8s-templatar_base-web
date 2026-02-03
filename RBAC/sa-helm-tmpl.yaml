@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${INFRA_NS}
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-helm
+  namespace: ${INFRA_NS}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ci-helm-role
+  namespace: ${INFRA_NS}
+rules:
+  # Read-only discovery / status
+  - apiGroups: [""]
+    resources: ["pods","services","endpoints","events","configmaps"]
+    verbs: ["get","list","watch"]
+
+  # Helm release storage + reading cluster resources it manages
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+
+  # Workloads (what helm typically manages)
+  - apiGroups: ["apps"]
+    resources: ["deployments","replicasets","statefulsets","daemonsets"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+
+  - apiGroups: ["batch"]
+    resources: ["jobs","cronjobs"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+
+  # Common extras many charts include
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses","networkpolicies"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get","list","watch"]
+
+  # If your charts create PVCs, keep this; otherwise you can remove it
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+
+  # OPTIONAL: allow exec/port-forward for debugging in CI
+  # Remove these blocks if you don’t want CI to exec into pods.
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+
+  - apiGroups: [""]
+    resources: ["pods/exec","pods/portforward"]
+    verbs: ["create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ci-helm-rb
+  namespace: ${INFRA_NS}
+subjects:
+  - kind: ServiceAccount
+    name: ci-helm
+    namespace: ${INFRA_NS}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ci-helm-role
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ci-helm-token
+  namespace: ${INFRA_NS}
+  annotations:
+    kubernetes.io/service-account.name: ci-helm
+type: kubernetes.io/service-account-token
