@@ -1,0 +1,15 @@
+  750  bao auth enable -namespace=admin kubernetes || true
+  751  bao write -namespace=admin auth/kubernetes/config   kubernetes_host="$K8S_HOST"   kubernetes_ca_cert=@/tmp/ca.crt   token_reviewer_jwt=@/tmp/reviewer.jwt
+  755  bao write -namespace=admin auth/kubernetes/config   kubernetes_host="$K8S_HOST"   kubernetes_ca_cert=@/tmp/ca.crt   token_reviewer_jwt=@/tmp/reviewer.jwt
+  757  bao policy write -namespace=admin eso-playground-qas /tmp/eso-playground-qas.hcl
+  758  bao write -namespace=admin auth/kubernetes/role/eso-playground-qas   bound_service_account_names=eso-vault   bound_service_account_namespaces=playground   policies=eso-playground-qas   ttl=1h
+  775  bao write -namespace=admin auth/kubernetes/role/eso-playground-qas   bound_service_account_names=external-secrets   bound_service_account_namespaces=external-secrets   policies=eso-playground-qas   ttl=1h
+  784  bao write -namespace=admin auth/kubernetes/config   kubernetes_host="$K8S_HOST"   kubernetes_ca_cert=@/tmp/ca.crt   token_reviewer_jwt=@/tmp/reviewer.jwt
+  797  bao write -namespace=admin auth/kubernetes/role/eso-playground-qas   bound_service_account_names=eso-vault   bound_service_account_namespaces=playground   policies=eso-playground-qas   ttl=1h
+  799  bao read -namespace=admin auth/kubernetes/config
+  805  bao write -namespace=admin auth/kubernetes/config   kubernetes_host="$K8S_HOST"   kubernetes_ca_cert=@/tmp/ca.crt   token_reviewer_jwt=@/tmp/reviewer.jwt
+  806  bao read -namespace=admin auth/kubernetes/config | grep token_reviewer
+  808  bao write -namespace=admin auth/kubernetes/role/eso-playground-qas   bound_service_account_names=eso-vault   bound_service_account_namespaces=playground   policies=eso-playground-qas   ttl=1h
+  829  history | gep bao > bao-totempl
+  830  cat bao-totempl
+  831  history | grep bao > bao-totempl

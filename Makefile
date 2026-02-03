@@ -1,6 +1,6 @@
 # --- ArgoCD / config repo bootstrap -----------------------------------------
 ARGOCD_NS            ?= argocd
-
+APPS                 ?= proxy client hasura
 # Choose auth mode: https or ssh
 CFG_AUTH             := https
 
@@ -11,30 +11,34 @@ CFG_GIT_TOKEN        ?= $${GIT_PASSWORD}
 # SSH auth vars (CFG_AUTH=ssh)
 CFG_REPO_SSH_URL     ?=   # e.g. git@github.com:org/repo.git
 CFG_GIT_SSH_KEY_FILE ?=   # path to deploy key file
-NAMESPACE            ?= $(ARGOCD_NS)
+
+####
 # defaults
-CFG_REPO_URL  		?= CFG_GIT_REPO=https://github.com/viaacode/tkn-demo.git
+CFG_GIT_REPO  		?= CFG_GIT_REPO=https://github.com/viaacode/tkn-demo.git
 REMOTE_CFG_DIR          := k8s-resources-remote
 REPO_URL      		?= CFG_GIT_REPO=https://github.com/viaacode/tkn-demo.git
+####
+
+
 SVC_PORT      		?= 5000
 IMAGE_NAME    		?= $(shell echo "$(FINAL_NAME)" | sed -E 's@[@].*$$@@; s@:[^/]*$$@@')
 DRY_RUN       		?= --dry-run=client
 APP_NAME                ?= cicd-helloworld-example
 ENV          		?= qas
-NAMESPACE     		?= meemoo-infra
 ENVS          		:= int qas prd
 REGISTRY_HOST 		?= meeregistrymoo.azurecr.io
 
 FINAL_NAME              ?= $(REGISTRY_HOST)/$(NAMESPACE)/$(APP_NAME):$(ENV)-latest
 
 
-export ENVS REGISTRY_HOST FINAL_NAME APP_NAME SVC_PORT
+export ENVS REGISTRY_HOST FINAL_NAME APP_NAME SVC_PORT APPS
 
 .PHONY: cfg-bootstrap cfg-sync cfg-push argocd-setup
 
-.PHONY: all set-ns build-all deploy-all-envs redeploy-all-envs undeploy-all-apps clone_appcode buildi pushi clone_cfg image2acr
+.PHONY: all set-ns build-all deploy-all-envs redeploy-all-envs undeploy-all-apps clone_appcode buildi pushi clone_cfg image2acr add_secret_store
 
-all: set-ns clean build-all deploy argocd-setup
+
+all: set-ns clean build-all cfg-bootstrap
 #build-all push_cfg
 
 
@@ -43,7 +47,10 @@ cfg-bootstrap: clone_cfg cfg-sync cfg-push
 .PHONY: default bootstrap clean deploy int qas prd
 default: all
 
-# "make APP_NAME=my-app" → bootstrap
+add_secret_store: set-ns
+	$(MAKE) -C ExternalSecrets -f eso_vault.mk eso_vault_sa
+	$(MAKE) -C ExternalSecrets -f eso_vault.mk ENV=$${ENV} APP_NS=$${NAMESPACE} eso_vault_setup
+	$(MAKE) -C Vault/ vault_eso_bootstrap
 
 # Sync local generated output into the config repo working tree
 cfg-sync:
@@ -57,8 +64,7 @@ cfg-sync:
 	@rsync -va --delete k8s-resources/kustomize/ $(REMOTE_CFG_DIR)/kustomize/
 
 	# argo applications (your generated root/child apps)
-	@rsync -va --delete k8s-resources/argocd/applications/ $(REMOTE_CFG_DIR)/argocd/applications/
-
+	@rsync -va --delete k8s-resources/argocd/ $(REMOTE_CFG_DIR)/argocd/
 	@echo "__done syncing__"
 
 cfg-push:
@@ -87,13 +93,14 @@ PREFIX        		?= $(NAMESPACE)
 SUFFIX        		?= $(ENV)
 
 ## configuration list of NAMESAPCE apps
-APPS          		?= $(APP_NAME)
 
 # App Metadata: Port and Source Code Repo, make these for every app in APPS list
-tkn-demo_PORT      	:= $(SVC_PORT)
-tkn-demo_REPO      	:= $(REPO_URL)
-tkn-demo_CFG_REPO      	:= $(CFG_REPO_URL)
+proxy_PORT      	:= $(SVC_PORT)
+proxy_REPO      	:= $(REPO_URL)
+_CFG_REPO      	        := $(CFG_REPO_URL)
 
+client_PORT		:= 5000
+hasura_PORT             := 8080
 
 
 # Use this to push the image to azure registry
@@ -148,7 +155,8 @@ build-all: set-ns
 		REPO_URL=$($(app)_REPO) \
 		SUFFIX=$${ENV} \
 		$(MAKE) bootstrap; \
-		$(MAKE) deploy-all-envs APP_NAME=$(app) SVC_PORT=$($(app)_PORT) REPO_URL=$($(app)_CFG_REPO); \
+		$(MAKE) deploy-all-envs APP_NAME=$(app) SVC_PORT=$($(app)_PORT) REPO_URL=$(_CFG_REPO); \
+		$(MAKE) kustomize_image APP_NAME=$(app) SVC_PORT=$($(app)_PORT) REPO_URL=$(_CFG_REPO); \
 	)
 	$(MAKE) create_structure
 	@echo "All resources generated in k8s-resources/"
@@ -217,8 +225,8 @@ bootstrap:
 	@for e in $(ENVS); do \
 		case $$e in \
 		  int) REPLICAS=0 CPU_REQUEST=50m  MEM_REQUEST=64Mi  CPU_LIMIT=200m MEM_LIMIT=256Mi ;; \
-		  qas) REPLICAS=1 CPU_REQUEST=100m MEM_REQUEST=128Mi CPU_LIMIT=250m MEM_LIMIT=384Mi ;; \
-		  prd) REPLICAS=2 CPU_REQUEST=200m MEM_REQUEST=256Mi CPU_LIMIT=200m MEM_LIMIT=512Mi ;; \
+		  qas) REPLICAS=0 CPU_REQUEST=100m MEM_REQUEST=128Mi CPU_LIMIT=250m MEM_LIMIT=384Mi ;; \
+		  prd) REPLICAS=0 CPU_REQUEST=200m MEM_REQUEST=256Mi CPU_LIMIT=200m MEM_LIMIT=512Mi ;; \
 		esac; \
 		ENV=$$e REPLICAS=$$REPLICAS envsubst < patch-replicas-tmpl.yaml  > "./$(APP_NAME)/overlays/$$e/patch-replicas.yaml"; \
 		ENV=$$e CPU_REQUEST=$$CPU_REQUEST MEM_REQUEST=$$MEM_REQUEST CPU_LIMIT=$$CPU_LIMIT MEM_LIMIT=$$MEM_LIMIT \

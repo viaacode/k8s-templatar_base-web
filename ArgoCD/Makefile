@@ -33,6 +33,13 @@ NAMESPACE            ?= $(ARGOCD_NS)
 # --- ArgoCD bootstrap: create repo creds + projects + (optionally) apply root-app
 argocd-bootstrap: set-ns generate-argocd argocd-apply-repo-creds argocd-apply-projects argocd-deploy-root-env
 all: set-ns login
+
+install:
+	@$(MAKE) -f install.mk install
+	@setup_argocd_cmd.sh
+
+
+
 default: generate-argocd argocd-deploy-root-env
 # This target generates the ArgoCD manifests for each app/env
 generate-argocd:
@@ -97,6 +104,5 @@ else ifeq ($(CFG_AUTH),ssh)
 else
 	@echo "Unknown CFG_AUTH: $(CFG_AUTH) (use https or ssh)"; exit 2
 endif
-
 
 

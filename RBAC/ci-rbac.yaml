@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-admin
+  namespace: argocd
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ci-admin-crb-argocd
+subjects:
+  - kind: ServiceAccount
+    name: ci-admin
+    namespace: argocd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ci-admin-token
+  namespace: argocd
+  annotations:
+    kubernetes.io/service-account.name: ci-admin
+type: kubernetes.io/service-account-token

@@ -1,4 +1,4 @@
-K8S_CTX            ?= kind-kind
+K8S_CTX            ?= aks-qas-auto
 absPathMakefile    = "$(abspath $(lastword $(MAKEFILE_LIST)))"
 wd                 = `dirname $(absPathMakefile)`
 WD                 := $(wd)/
@@ -35,7 +35,12 @@ install:
 	@kubectl apply -f "https://raw.githubusercontent.com/external-secrets/external-secrets/v1.1.0/deploy/crds/bundle.yaml" --server-side
 
 
-add_secret_store: setctx
+
+
+add_secret_store:
+	$(MAKE) -f eso_vault.mk all
+
+add_secret_store_tokenbased: setctx
 	#cat secretstore-tmpl.yaml | envsubst | tee  external-secret-store-$(NAMESPACE).yaml
 	envsubst < secretstore-hashicloud-tmpl.yaml > external-secret-store-$(NAMESPACE).yaml
 	kubectl replace -f external-secret-store-$(NAMESPACE).yaml || kubectl apply -f external-secret-store-$(NAMESPACE).yaml

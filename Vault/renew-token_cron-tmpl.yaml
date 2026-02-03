@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: renew-vault-token
+  namespace: playground
+spec:
+  schedule: "*/30 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: default
+          restartPolicy: OnFailure
+          containers:
+          - name: renew
+            image: alpine:3.20
+            env:
+              - name: VAULT_ADDR
+                value: "${VAUILT-ADDR}"
+              - name: VAULT_NAMESPACE
+                value: "admin"
+            command: ["/bin/sh","-lc"]
+            args:
+              - |
+                set -euo pipefail
+                apk add --no-cache curl jq kubectl
+
+                TOKEN="$(kubectl -n ${NAMESPACE} get secret vault-token -o jsonpath='{.data.token}' | base64 -d)"
+
+                # Renew token
+                RESP="$(curl -sS -X POST \
+                  -H "X-Vault-Token: ${TOKEN}" \
+                  -H "X-Vault-Namespace: ${VAULT_NAMESPACE}" \
+                  "${VAULT_ADDR}/v1/auth/token/renew-self")"
+
+                echo "$RESP" | jq -e . >/dev/null
+                echo "✅ token renewed"
